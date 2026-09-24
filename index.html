@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ZEDAM GYM - برنامج تدريبي</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="theme-color" content="#1f6feb">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+:root{
+  --bg:#f4f5f7; --card:#ffffff; --text:#1c1f26; --muted:#6b7280;
+  --accent:#1f6feb; --accent2:#e8b64c; --border:#e3e5ea; --note-bg:#eaf3ff; --note-border:#bcd9ff;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  box-sizing:border-box;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#14161a; --card:#1e2127; --text:#f0f1f3; --muted:#9aa0aa; --border:#31353d; --note-bg:#16283f; --note-border:#28527f;
+}}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;font-family:'Cairo',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100%}
+.wrap{max-width:640px;margin:0 auto;padding:16px}
+.screen{display:none}
+.screen.active{display:block}
+h1{font-size:1.4rem;margin:.2rem 0}
+.logo{font-weight:800;font-size:1.6rem;color:var(--accent);text-align:center;margin-top:10px}
+.sub{color:var(--muted);text-align:center;margin-bottom:20px}
+.big-btn{display:block;width:100%;background:var(--card);border:2px dashed var(--accent);border-radius:16px;padding:26px 16px;text-align:center;font-size:1.15rem;font-weight:600;color:var(--accent);cursor:pointer;margin-top:24px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+input[type=text],input[type=number],select{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-family:inherit;font-size:.95rem;margin-bottom:10px}
+.row2{display:flex;gap:10px}
+.row2>div{flex:1}
+.ex-card{position:relative}
+.ex-card .del{position:absolute;left:8px;top:8px;background:#e5484d;color:#fff;border:none;border-radius:8px;width:26px;height:26px;font-weight:700;cursor:pointer}
+.gif-box{border:1px dashed var(--border);border-radius:10px;padding:8px;text-align:center;color:var(--muted);font-size:.85rem}
+.gif-box img{max-width:100%;max-height:110px;border-radius:8px;display:block;margin:0 auto 6px}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:1rem;width:100%;cursor:pointer;margin-top:6px}
+.btn.secondary{background:var(--card);color:var(--accent);border:1px solid var(--accent)}
+.btn.wa{background:#25D366}
+.nav{display:flex;gap:10px;margin-top:16px}
+.nav .btn{margin-top:0}
+/* Poster preview */
+#poster{background:var(--card);border-radius:14px;overflow:hidden;border:1px solid var(--border)}
+.poster-head{background:var(--accent2);color:#23262b;text-align:center;padding:16px;font-weight:800;font-size:1.2rem}
+.poster-sub{background:var(--accent2);color:#23262b;text-align:center;padding:0 16px 12px;font-size:.85rem}
+.poster-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:14px}
+.poster-ex{border:1px solid var(--border);border-radius:10px;padding:8px;text-align:center;background:var(--bg)}
+.poster-ex img{width:100%;height:80px;object-fit:cover;border-radius:8px;margin-bottom:6px;background:#ddd}
+.poster-ex .name{font-weight:700;font-size:.82rem}
+.poster-ex .sr{color:var(--muted);font-size:.78rem}
+.note{margin:14px;background:var(--note-bg);border:1px solid var(--note-border);border-radius:10px;padding:10px;font-size:.82rem}
+.poster-foot{text-align:center;padding:10px;font-weight:800;color:var(--accent);font-size:.9rem}
+#exportImgWrap{display:none;margin-top:14px;text-align:center}
+#exportImgWrap img{max-width:100%;border-radius:10px;border:1px solid var(--border)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
+.chip{flex:0 0 auto;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:8px 14px;font-size:.85rem;font-family:inherit;cursor:pointer;color:var(--text)}
+.chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.lib-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.lib-item{position:relative;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px;text-align:center;cursor:pointer}
+.lib-item img{width:100%;height:70px;object-fit:cover;border-radius:8px;margin-bottom:4px}
+.lib-item .name{font-size:.72rem;font-weight:600}
+.lib-item .del{width:22px;height:22px;font-size:.7rem;top:4px;left:4px;position:absolute}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:flex-end;justify-content:center}
+.modal{background:var(--bg);width:100%;max-width:640px;max-height:80vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Home -->
+  <div class="screen active" id="screen-home">
+    <div class="logo">ZEDAM GYM</div>
+    <div class="sub">مصمم البرامج التدريبية</div>
+    <div class="big-btn" onclick="goTo('form')">➕ تصميم برنامج تدريبي</div>
+    <div class="big-btn" onclick="goTo('library'); renderLibChips(); renderLibGrid();" style="border-color:var(--accent2);color:#b8860b">📚 مكتبة التمارين</div>
+  </div>
+
+  <!-- Form -->
+  <div class="screen" id="screen-form">
+    <h1>معلومات المتدرب</h1>
+    <div class="card">
+      <label>اسم المتدرب</label>
+      <input type="text" id="traineeName" placeholder="مثال: أحمد">
+      <div class="row2">
+        <div><label>العمر</label><input type="number" id="traineeAge"></div>
+        <div><label>الهدف</label><input type="text" id="traineeGoal" placeholder="تضخيم / تنشيف"></div>
+      </div>
+      <label>عنوان البرنامج - الجزء الأول</label>
+      <select id="progTitleSelect1" onchange="toggleTitleCustom(1, this.value)"></select>
+      <input type="text" id="progTitleCustom1" placeholder="اكتب اسم البرنامج" style="display:none">
+
+      <label>عنوان البرنامج - الجزء الثاني (اختياري)</label>
+      <select id="progTitleSelect2" onchange="toggleTitleCustom(2, this.value)"></select>
+      <input type="text" id="progTitleCustom2" placeholder="اكتب اسم البرنامج" style="display:none">
+    </div>
+
+    <h1>التمارين</h1>
+    <div id="exList"></div>
+    <div class="btn secondary" onclick="addExercise()">➕ إضافة تمرين</div>
+
+    <div class="nav">
+      <div class="btn secondary" onclick="goTo('home')">رجوع</div>
+      <div class="btn" onclick="buildPreview()">معاينة البرنامج ➜</div>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="screen" id="screen-preview">
+    <h1>معاينة البرنامج</h1>
+    <div id="poster"></div>
+
+    <div id="exportImgWrap">
+      <img id="exportImg" alt="صورة البرنامج">
+      <a class="btn secondary" id="downloadLink" download="training-program.png" style="display:block;text-decoration:none;text-align:center;margin-top:8px">⬇ تحميل الصورة</a>
+    </div>
+
+    <div class="btn" onclick="exportImage()">🖼 تحويل إلى صورة</div>
+    <div class="btn wa" onclick="sendWhatsapp()">📲 إرسال عبر واتساب</div>
+    <div class="nav">
+      <div class="btn secondary" onclick="goTo('form')">تعديل البرنامج</div>
+    </div>
+  </div>
+
+  <!-- Library -->
+  <div class="screen" id="screen-library">
+    <h1>📚 مكتبة التمارين</h1>
+    <div class="chips" id="libChips"></div>
+    <div class="btn secondary" onclick="toggleAddForm()">➕ إضافة تمرين</div>
+    <div class="card" id="addExForm" style="display:none">
+      <label>اسم التمرين</label>
+      <input type="text" id="libExName" placeholder="مثال: ضغط بنش مسطح">
+      <label>صورة GIF أو فيديو</label>
+      <input type="file" accept="image/*,video/*" id="libExFile">
+      <div class="btn" onclick="saveLibExercise()">حفظ في المكتبة</div>
+    </div>
+    <div class="lib-grid" id="libGrid"></div>
+    <div class="nav">
+      <div class="btn secondary" onclick="goTo('home')">رجوع</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Import modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <h1 style="margin:0;font-size:1.1rem">استيراد من المكتبة</h1>
+      <button class="del" style="position:static" onclick="closeImport()">✕</button>
+    </div>
+    <div class="chips" id="importChips"></div>
+    <div class="lib-grid" id="importGrid"></div>
+  </div>
+</div>
+
+<script>
+const COMMON = ["ضغط بنش","سكوات","سحب علوي","ديدليفت","كتف بار","بايسبس بار","ترايسبس حبل","بطن معلق","بلانك","بريس كتف دامبل","أخرى (كتابة يدوية)"];
+const PROGRAM_NAMES = ["صدر بايسبس بطن","ظهر ترايسبس","أكتاف بطن","بايسبس ترايسبس","أرجل بطن","عضلات بطن","سواعد","PPL","LEG","أخرى (كتابة يدوية)"];
+
+function fillProgramSelects(){
+  document.getElementById('progTitleSelect1').innerHTML =
+    PROGRAM_NAMES.map(p=>`<option value="${p}">${p}</option>`).join('');
+  document.getElementById('progTitleSelect2').innerHTML =
+    '<option value="">بدون</option>' + PROGRAM_NAMES.map(p=>`<option value="${p}">${p}</option>`).join('');
+}
+fillProgramSelects();
+const CATEGORIES = ["صدر","ظهر","أكتاف","بايسبس","ترايسبس","أرجل","بطن","ترابيس","كارديو"];
+let exCount = 0;
+let currentLibCat = CATEGORIES[0];
+
+function getLib(){
+  try{ return JSON.parse(localStorage.getItem('zedamLib')||'{}'); }catch(e){ return {}; }
+}
+function saveLib(lib){
+  try{ localStorage.setItem('zedamLib', JSON.stringify(lib)); }catch(e){}
+}
+function renderLibChips(){
+  document.getElementById('libChips').innerHTML = CATEGORIES.map(c=>
+    `<button class="chip ${c===currentLibCat?'active':''}" onclick="selectLibCat('${c}')">${c}</button>`).join('');
+}
+function selectLibCat(c){
+  currentLibCat = c;
+  renderLibChips();
+  renderLibGrid();
+}
+function toggleAddForm(){
+  const f = document.getElementById('addExForm');
+  f.style.display = f.style.display === 'none' ? 'block' : 'none';
+}
+function saveLibExercise(){
+  const name = document.getElementById('libExName').value.trim();
+  const fileInput = document.getElementById('libExFile');
+  const file = fileInput.files[0];
+  if(!name){ alert('اكتب اسم التمرين'); return; }
+  const finish = (img)=>{
+    const lib = getLib();
+    if(!lib[currentLibCat]) lib[currentLibCat] = [];
+    lib[currentLibCat].push({id: Date.now(), name, img: img || ''});
+    saveLib(lib);
+    document.getElementById('libExName').value = '';
+    fileInput.value = '';
+    document.getElementById('addExForm').style.display = 'none';
+    renderLibGrid();
+  };
+  if(file){
+    fileToImage(file, finish);
+  } else {
+    finish('');
+  }
+}
+function deleteLibExercise(cat, id){
+  const lib = getLib();
+  lib[cat] = (lib[cat] || []).filter(x => x.id !== id);
+  saveLib(lib);
+  renderLibGrid();
+}
+function renderLibGrid(){
+  const lib = getLib();
+  const items = lib[currentLibCat] || [];
+  const grid = document.getElementById('libGrid');
+  if(items.length === 0){
+    grid.innerHTML = `<div class="sub">لا توجد تمارين بعد في "${currentLibCat}"</div>`;
+    return;
+  }
+  grid.innerHTML = items.map(it => `
+    <div class="lib-item">
+      <button class="del" onclick="deleteLibExercise('${currentLibCat}', ${it.id})">✕</button>
+      ${it.img ? `<img src="${it.img}">` : `<div style="height:70px;background:var(--bg);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem">لا صورة</div>`}
+      <div class="name">${it.name}</div>
+    </div>`).join('');
+}
+
+function openImport(exId){
+  const modal = document.getElementById('importModal');
+  modal.dataset.target = exId;
+  modal.style.display = 'flex';
+  importCat(CATEGORIES[0]);
+}
+function closeImport(){
+  document.getElementById('importModal').style.display = 'none';
+}
+function importCat(c){
+  document.getElementById('importChips').innerHTML = CATEGORIES.map(cat=>
+    `<button class="chip ${cat===c?'active':''}" onclick="importCat('${cat}')">${cat}</button>`).join('');
+  const lib = getLib();
+  const items = lib[c] || [];
+  const grid = document.getElementById('importGrid');
+  if(items.length === 0){
+    grid.innerHTML = `<div class="sub">لا توجد تمارين في "${c}"</div>`;
+    return;
+  }
+  const exId = document.getElementById('importModal').dataset.target;
+  grid.innerHTML = items.map(it => `
+    <div class="lib-item" onclick="applyImportById(${exId}, '${c}', ${it.id})">
+      ${it.img ? `<img src="${it.img}">` : `<div style="height:70px;background:var(--bg);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem">لا صورة</div>`}
+      <div class="name">${it.name}</div>
+    </div>`).join('');
+}
+function applyImportById(exId, cat, id){
+  const lib = getLib();
+  const item = (lib[cat] || []).find(x => x.id === id);
+  if(!item) return;
+  const select = document.querySelector('#ex-' + exId + ' select');
+  select.value = "أخرى (كتابة يدوية)";
+  toggleCustom(exId, select.value);
+  document.getElementById('custom-' + exId).value = item.name;
+  const box = document.getElementById('gifbox-' + exId);
+  box.dataset.img = item.img;
+  box.innerHTML = item.img
+    ? `<img src="${item.img}"><input type="file" accept="image/*,video/*" style="display:block;margin:0 auto" onchange="loadGif(${exId}, this)">`
+    : `اضغط لاختيار صورة/GIF أو فيديو<input type="file" accept="image/*,video/*" style="display:block;margin:6px auto 0" onchange="loadGif(${exId}, this)">`;
+  closeImport();
+}
+
+function goTo(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function addExercise(){
+  exCount++;
+  const id = exCount;
+  const div = document.createElement('div');
+  div.className = 'card ex-card';
+  div.id = 'ex-'+id;
+  div.innerHTML = `
+    <button class="del" onclick="document.getElementById('ex-${id}').remove()">✕</button>
+    <div class="btn secondary" style="margin-bottom:10px" onclick="openImport(${id})">📚 استيراد من المكتبة</div>
+    <label>اختر التمرين</label>
+    <select onchange="toggleCustom(${id}, this.value)">
+      ${COMMON.map(c=>`<option value="${c}">${c}</option>`).join('')}
+    </select>
+    <input type="text" id="custom-${id}" placeholder="اكتب اسم التمرين" style="display:none">
+    <div class="row2">
+      <div><label>عدد المجموعات</label><input type="number" id="sets-${id}" value="3"></div>
+      <div><label>عدد التكرارات</label><input type="number" id="reps-${id}" value="12"></div>
+    </div>
+    <label>صورة GIF أو فيديو للتمرين</label>
+    <div class="gif-box" id="gifbox-${id}">
+      اضغط لاختيار صورة/GIF أو فيديو
+      <input type="file" accept="image/*,video/*" style="display:block;margin:6px auto 0" onchange="loadGif(${id}, this)">
+    </div>
+  `;
+  document.getElementById('exList').appendChild(div);
+}
+
+function toggleCustom(id, val){
+  document.getElementById('custom-'+id).style.display = val.startsWith('أخرى') ? 'block' : 'none';
+}
+
+function toggleTitleCustom(n, val){
+  document.getElementById('progTitleCustom'+n).style.display = val.startsWith('أخرى') ? 'block' : 'none';
+}
+
+function fileToImage(file, callback){
+  if(file.type.startsWith('video/')){
+    const video = document.createElement('video');
+    video.muted = true;
+    video.playsInline = true;
+    video.preload = 'metadata';
+    const url = URL.createObjectURL(file);
+    video.src = url;
+    video.addEventListener('loadeddata', () => {
+      video.currentTime = Math.min(0.3, (video.duration || 1) / 2);
+    });
+    video.addEventListener('seeked', () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth || 300;
+      canvas.height = video.videoHeight || 300;
+      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      callback(canvas.toDataURL('image/png'));
+    }, {once:true});
+  } else {
+    const reader = new FileReader();
+    reader.onload = e => callback(e.target.result);
+    reader.readAsDataURL(file);
+  }
+}
+
+function loadGif(id, input){
+  const file = input.files[0];
+  if(!file) return;
+  fileToImage(file, (dataUrl) => {
+    const box = document.getElementById('gifbox-'+id);
+    box.dataset.img = dataUrl;
+    box.innerHTML = `<img src="${dataUrl}"><input type="file" accept="image/*,video/*" style="display:block;margin:0 auto" onchange="loadGif(${id}, this)">`;
+  });
+}
+
+function buildPreview(){
+  const name = document.getElementById('traineeName').value || 'المتدرب';
+  let part1 = document.getElementById('progTitleSelect1').value;
+  if(part1.startsWith('أخرى')) part1 = document.getElementById('progTitleCustom1').value || '';
+  let part2 = document.getElementById('progTitleSelect2').value;
+  if(part2.startsWith('أخرى')) part2 = document.getElementById('progTitleCustom2').value || '';
+  const title = [part1, part2].filter(Boolean).join(' + ') || ('برنامج تمرين ' + name);
+  const cards = document.querySelectorAll('.ex-card');
+  let exercises = [];
+  cards.forEach(c=>{
+    const id = c.id.split('-')[1];
+    const select = c.querySelector('select');
+    let exName = select.value;
+    if(exName.startsWith('أخرى')){
+      exName = document.getElementById('custom-'+id).value || 'تمرين';
+    }
+    const sets = document.getElementById('sets-'+id).value || '3';
+    const reps = document.getElementById('reps-'+id).value || '12';
+    const img = document.getElementById('gifbox-'+id).dataset.img || '';
+    exercises.push({name:exName, sets, reps, img});
+  });
+
+  if(exercises.length === 0){
+    alert('أضف تمرينًا واحدًا على الأقل قبل المعاينة');
+    return;
+  }
+
+  let html = `<div class="poster-head">${title}</div>
+    <div class="poster-sub">${name} ${document.getElementById('traineeAge').value ? '- ' + document.getElementById('traineeAge').value + ' سنة' : ''} ${document.getElementById('traineeGoal').value ? '- ' + document.getElementById('traineeGoal').value : ''}</div>
+    <div class="poster-grid">`;
+  exercises.forEach(ex=>{
+    html += `<div class="poster-ex">
+      ${ex.img ? `<img src="${ex.img}">` : `<div style="height:80px;background:var(--bg);border-radius:8px;margin-bottom:6px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.7rem">لا صورة</div>`}
+      <div class="name">${ex.name}</div>
+      <div class="sr">${ex.sets} × ${ex.reps}</div>
+    </div>`;
+  });
+  html += `</div>
+    <div class="note">📌 ملاحظة: الراحة بين كل مجموعة وأخرى 60 ثانية. اشرب الماء بانتظام والتزم بالتغذية المناسبة لهدفك.</div>
+    <div class="poster-foot">ZEDAM GYM 💪</div>`;
+
+  document.getElementById('poster').innerHTML = html;
+  document.getElementById('exportImgWrap').style.display = 'none';
+  goTo('preview');
+}
+
+function exportImage(){
+  html2canvas(document.getElementById('poster'), {backgroundColor:null, scale:2}).then(canvas=>{
+    const dataUrl = canvas.toDataURL('image/png');
+    document.getElementById('exportImg').src = dataUrl;
+    document.getElementById('downloadLink').href = dataUrl;
+    document.getElementById('exportImgWrap').style.display = 'block';
+  });
+}
+
+async function sendWhatsapp(){
+  const canvas = await html2canvas(document.getElementById('poster'), {backgroundColor:null, scale:2});
+  canvas.toBlob(async (blob) => {
+    const file = new File([blob], 'training-program.png', {type:'image/png'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{
+        await navigator.share({files:[file], title:'برنامج تدريبي', text:'برنامجك التدريبي من ZEDAM GYM 💪'});
+        return;
+      }catch(e){}
+    }
+    // fallback: prepare download then open WhatsApp chat
+    const dataUrl = canvas.toDataURL('image/png');
+    document.getElementById('exportImg').src = dataUrl;
+    document.getElementById('downloadLink').href = dataUrl;
+    document.getElementById('exportImgWrap').style.display = 'block';
+    alert('تم تجهيز الصورة. قم بتحميلها ثم أرفقها يدويًا في واتساب (سيتم فتح واتساب الآن).');
+    window.open('https://wa.me/?text=' + encodeURIComponent('برنامجك التدريبي من ZEDAM GYM 💪'), '_blank');
+  }, 'image/png');
+}
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
