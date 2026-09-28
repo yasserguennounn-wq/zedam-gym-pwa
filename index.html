@@ -9,7 +9,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="theme-color" content="#1f6feb">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;800&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gifshot/0.3.2/gifshot.min.js"></script>
 <style>
 :root{
   --bg:#f4f5f7; --card:#ffffff; --text:#1c1f26; --muted:#6b7280;
@@ -105,6 +105,8 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
       <label>عنوان البرنامج - الجزء الثاني (اختياري)</label>
       <select id="progTitleSelect2" onchange="toggleTitleCustom(2, this.value)"></select>
       <input type="text" id="progTitleCustom2" placeholder="اكتب اسم البرنامج" style="display:none">
+      <label>ملاحظة تظهر في الصورة</label>
+      <input type="text" id="traineeNote" value="الاحماء جيدا من 5 الى 10 دقائق">
     </div>
 
     <h1>التمارين</h1>
@@ -132,19 +134,16 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 
   <!-- Preview -->
   <div class="screen" id="screen-preview">
-    <h1>معاينة البرنامج</h1>
-    <div id="poster"></div>
-
-    <div id="exportImgWrap">
-      <img id="exportImg" alt="صورة البرنامج">
-      <a class="btn secondary" id="downloadLink" download="training-program.png" style="display:block;text-decoration:none;text-align:center;margin-top:8px">⬇ تحميل الصورة</a>
+    <h1>النتيجة</h1>
+    <div id="genStatus" class="sub"></div>
+    <div id="resultWrap" style="display:none;text-align:center">
+      <img id="resultImg" alt="النتيجة" style="max-width:100%;border-radius:10px;border:1px solid var(--border)">
+      <a class="btn secondary" id="downloadLink" download="training-program.gif" style="display:block;text-decoration:none;text-align:center;margin-top:8px">⬇ تحميل</a>
     </div>
-
-    <div class="btn" onclick="exportImage()">🖼 تحويل إلى صورة</div>
-    <div class="btn wa" onclick="sendWhatsapp()">📲 إرسال عبر واتساب</div>
-    <div class="nav">
-      <div class="btn secondary" onclick="goTo('form')">تعديل البرنامج</div>
-    </div>
+    <div class="btn wa" onclick="shareResult()">📲 إرسال عبر واتساب</div>
+    <div class="btn secondary" onclick="generate('png')">🖼 صورة ثابتة بدل GIF</div>
+    <div class="btn secondary" onclick="generate('gif')">🔄 إعادة إنشاء الـ GIF</div>
+    <div class="nav"><div class="btn secondary" onclick="goTo('exercises')">تعديل التمارين</div></div>
   </div>
 
   <!-- Library -->
@@ -280,7 +279,7 @@ const mediaHTML = (it, i) => it.type === 'video'
 
 /* صفحة تصميم البرنامج */
 function pickPhone(){ $('phoneFile').click(); }
-function addItem(o){ program.push({id: ++uid, sets: 3, reps: 12, url: URL.createObjectURL(o.blob), ...o}); }
+function addItem(o){ program.push({id: ++uid, sets: 3, reps: 12, sec: 1, url: URL.createObjectURL(o.blob), ...o}); }
 async function addFromPhone(input){
   const files = [...input.files]; input.value = '';
   for(const f of files){
@@ -290,7 +289,7 @@ async function addFromPhone(input){
   renderProgram(); toast('تمت إضافة ' + files.length + ' تمرين');
 }
 function renderProgram(){
-  const box = $('progList');
+  const box = $('progList'), pn = partNames(), two = !!pn[1];
   if(!program.length){ box.innerHTML = '<div class="sub">لم تضف أي تمرين بعد</div>'; return; }
   box.innerHTML = program.map((it, i) => `
     <div class="card ex-card">
@@ -298,6 +297,7 @@ function renderProgram(){
       <div class="media">${mediaHTML(it, i)}</div>
       <label>اسم التمرين (اكتب أو اختر)</label>
       <input type="text" list="exNames" value="${esc(it.name)}" oninput="program[${i}].name=this.value">
+      ${two ? `<label>القسم في الصورة</label><div class="row2"><div class="chip ${it.sec === 2 ? '' : 'active'}" style="text-align:center" onclick="setSec(${i},1)">${esc(pn[0])}</div><div class="chip ${it.sec === 2 ? 'active' : ''}" style="text-align:center" onclick="setSec(${i},2)">${esc(pn[1])}</div></div>` : ''}
       <div class="row2">
         <div><label>المجموعات</label><input type="number" value="${esc(it.sets)}" oninput="program[${i}].sets=this.value"></div>
         <div><label>التكرارات</label><input type="number" value="${esc(it.reps)}" oninput="program[${i}].reps=this.value"></div>
@@ -364,46 +364,144 @@ function pickLib(id){
   renderProgram(); toast('تمت إضافة: ' + it.name);
 }
 
-/* المعاينة والتصدير */
-function buildPreview(){
-  if(!program.length){ toast('أضف تمرينًا واحدًا على الأقل'); return; }
-  const name = $('traineeName').value || 'المتدرب';
+/* أجزاء العنوان وترتيب الصورة */
+function partNames(){
   let p1 = $('progTitleSelect1').value; if(p1.startsWith('أخرى')) p1 = $('progTitleCustom1').value || '';
   let p2 = $('progTitleSelect2').value; if(p2.startsWith('أخرى')) p2 = $('progTitleCustom2').value || '';
-  const title = [p1, p2].filter(Boolean).join(' + ') || ('برنامج تمرين ' + name);
-  const age = $('traineeAge').value, goal = $('traineeGoal').value;
-  $('poster').innerHTML = `<div class="poster-head">${esc(title)}</div>
-    <div class="poster-sub">${esc(name)}${age ? ' - ' + esc(age) + ' سنة' : ''}${goal ? ' - ' + esc(goal) : ''}</div>
-    <div class="poster-grid">${program.map((it, i) => `<div class="poster-ex">${mediaHTML(it, i)}<div class="name">${esc(it.name || 'تمرين')}</div><div class="sr">${esc(it.sets)} × ${esc(it.reps)}</div></div>`).join('')}</div>
-    <div class="note">📌 ملاحظة: الراحة بين كل مجموعة وأخرى 60 ثانية. اشرب الماء بانتظام والتزم بالتغذية المناسبة لهدفك.</div>
-    <div class="poster-foot">ZEDAM GYM 💪</div>`;
-  playAll($('poster'));
-  $('exportImgWrap').style.display = 'none';
-  goTo('preview');
+  return [p1.trim(), p2.trim()];
 }
-/* في الصورة المصدّرة تُستبدل الفيديوهات بلقطة منها */
-const posterCanvas = () => html2canvas($('poster'), {backgroundColor: null, scale: 2, onclone: doc => {
-  doc.querySelectorAll('[data-i]').forEach(m => {
-    const t = program[m.dataset.i].thumb;
-    if(t){ const im = doc.createElement('img'); im.src = t; m.replaceWith(im); }
+function setSec(i, v){ program[i].sec = v; renderProgram(); }
+const ORD = ['الاول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر'];
+const ordName = n => 'التمرين ' + (ORD[n] || (n + 1));
+
+function makeLayout(){
+  const W = 960, titleH = 64, cw = W / 5, pn = partNames();
+  const secs = pn[1] ? [program.filter(x => x.sec !== 2), program.filter(x => x.sec === 2)] : [program.slice()];
+  const lines = [];
+  secs.forEach(items => { for(let i = 0; i < items.length; i += 5) lines.push(items.slice(i, i + 5).map((it, k) => ({it, n: i + k}))); });
+  if(!lines.length || lines[lines.length - 1].length > 4) lines.push([]);
+  const H = Math.max(400, titleH + lines.length * 245), lh = (H - titleH) / lines.length, cells = [];
+  lines.forEach((ln, li) => ln.forEach((o, k) => cells.push({it: o.it, n: o.n, x: k * cw, y: titleH + li * lh, w: cw, h: lh})));
+  const last = lines.length - 1, nx = lines[last].length * cw;
+  return {W, H, titleH, lh, cells, lines, note: {x: nx, y: titleH + last * lh, w: W - nx, h: lh},
+          title: 'برنامج تمرين ' + pn.filter(Boolean).join(' ')};
+}
+function drawBase(L, logo){
+  const c = document.createElement('canvas'); c.width = L.W; c.height = L.H;
+  const g = c.getContext('2d');
+  g.fillStyle = '#fff'; g.fillRect(0, 0, L.W, L.H);
+  const gr = g.createLinearGradient(0, 0, 0, L.titleH); gr.addColorStop(0, '#f7e9c6'); gr.addColorStop(1, '#f0daa3');
+  g.fillStyle = gr; g.fillRect(0, 0, L.W, L.titleH);
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1b1b1b'; g.direction = 'rtl';
+  g.font = '800 32px Cairo, sans-serif'; g.fillText(L.title, L.W / 2, L.titleH / 2 + 2);
+  const nm = $('traineeName').value.trim();
+  if(nm){ g.font = '600 15px Cairo, sans-serif'; g.textAlign = 'left'; g.fillText(nm, 14, L.titleH / 2); g.textAlign = 'center'; }
+  g.fillStyle = '#111';
+  for(let i = 0; i < L.lines.length; i++) g.fillRect(0, L.titleH + i * L.lh - 1, L.W, 2);
+  L.cells.forEach(c => {
+    g.fillStyle = '#111'; g.direction = 'rtl'; g.font = '800 17px Cairo, sans-serif';
+    g.fillText(ordName(c.n), c.x + c.w / 2, c.y + 20);
+    g.direction = 'ltr'; g.font = '800 20px Cairo, sans-serif';
+    g.fillText(c.it.sets + ' × ' + c.it.reps, c.x + c.w / 2, c.y + c.h - 18);
   });
-}});
-function showExport(canvas){
-  const u = canvas.toDataURL('image/png');
-  $('exportImg').src = u; $('downloadLink').href = u; $('exportImgWrap').style.display = 'block';
+  const n = L.note; g.fillStyle = '#a9ddd9'; g.fillRect(n.x, n.y, n.w, n.h);
+  const r = Math.min(n.h * 0.22, n.w * 0.3), cx = n.x + n.w / 2, cy = n.y + n.h * 0.32;
+  if(logo){ g.save(); g.beginPath(); g.arc(cx, cy, r, 0, 7); g.clip(); g.drawImage(logo, cx - r, cy - r, 2 * r, 2 * r); g.restore(); }
+  const txt = $('traineeNote').value.trim();
+  if(txt){
+    g.fillStyle = '#123a39'; g.direction = 'rtl'; g.font = '800 21px Cairo, sans-serif';
+    const maxW = n.w - 28, ls = []; let line = '';
+    txt.split(/\s+/).forEach(w => { const t = line ? line + ' ' + w : w; if(g.measureText(t).width > maxW && line){ ls.push(line); line = w; } else line = t; });
+    ls.push(line);
+    ls.forEach((t, i) => g.fillText(t, cx, cy + r + 22 + i * 27));
+  }
+  return c;
 }
-function exportImage(){ posterCanvas().then(showExport); }
-async function sendWhatsapp(){
-  const canvas = await posterCanvas();
-  canvas.toBlob(async blob => {
-    const file = new File([blob], 'training-program.png', {type:'image/png'});
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      try{ await navigator.share({files:[file], title:'برنامج تدريبي', text:'برنامجك التدريبي من ZEDAM GYM 💪'}); return; }catch(e){}
+function drawMedia(g, L, els){
+  L.cells.forEach((c, i) => {
+    const m = els[i]; if(!m) return;
+    const w = m.videoWidth || m.naturalWidth, h = m.videoHeight || m.naturalHeight; if(!w || !h) return;
+    const bx = c.x + 8, by = c.y + 32, bw = c.w - 16, bh = c.h - 72, k = Math.min(bw / w, bh / h);
+    g.drawImage(m, bx + (bw - w * k) / 2, by + (bh - h * k) / 2, w * k, h * k);
+  });
+}
+function prepMedia(items){
+  return Promise.all(items.map(it => new Promise(res => {
+    if(it.type !== 'video'){ const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = it.url; return; }
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.style.cssText = 'position:fixed;left:-9999px;width:2px;height:2px';
+    document.body.appendChild(v);
+    const t = setTimeout(() => res(v), 8000);
+    v.onloadeddata = () => { clearTimeout(t); res(v); };
+    v.onerror = () => { clearTimeout(t); res(null); };
+    v.src = it.url;
+  })));
+}
+const seekTo = (v, t) => new Promise(res => {
+  if(!v || v.tagName !== 'VIDEO'){ res(); return; }
+  const d = v.duration; t = (d > 0 && isFinite(d)) ? t % d : 0;
+  if(Math.abs(v.currentTime - t) < 0.02){ res(); return; }
+  const done = () => { v.removeEventListener('seeked', done); res(); };
+  v.addEventListener('seeked', done); v.currentTime = t; setTimeout(done, 1500);
+});
+const loadScript = u => new Promise((ok, no) => { const s = document.createElement('script'); s.src = u; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+
+let busy = false, lastBlob = null, lastKind = 'gif', lastUrl = '';
+async function generate(kind){
+  if(busy) return;
+  if(!program.length){ toast('أضف تمرينًا واحدًا على الأقل'); return; }
+  busy = true; $('resultWrap').style.display = 'none';
+  const st = $('genStatus'); let els = [];
+  try{
+    st.textContent = 'جاري تحضير التمارين...';
+    try{ await document.fonts.load('800 32px Cairo', 'برنامج تمرين'); await document.fonts.load('600 15px Cairo', 'المتدرب'); }catch(e){}
+    if(kind === 'gif' && !window.gifshot){ try{ await loadScript('https://cdn.jsdelivr.net/npm/gifshot@0.3.2/dist/gifshot.min.js'); }catch(e){} }
+    if(kind === 'gif' && !window.gifshot) throw new Error('مكتبة GIF لم تُحمَّل، تأكد من الاتصال بالإنترنت');
+    const L = makeLayout();
+    const logo = await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = 'icon-512.png'; });
+    const base = drawBase(L, logo);
+    els = await prepMedia(L.cells.map(c => c.it));
+    const secs = Math.min(4, Math.max(2, ...els.map(e => e && e.tagName === 'VIDEO' && isFinite(e.duration) ? e.duration : 0)));
+    const fps = 8, N = kind === 'png' ? 1 : Math.round(secs * fps);
+    const cv = document.createElement('canvas'); cv.width = L.W; cv.height = L.H;
+    const g = cv.getContext('2d'), frames = [];
+    for(let f = 0; f < N; f++){
+      st.textContent = 'جاري التقاط اللقطات ' + (f + 1) + '/' + N;
+      await Promise.all(els.map(e => seekTo(e, kind === 'png' ? 0.3 : f / fps)));
+      await new Promise(r => requestAnimationFrame(r));
+      g.drawImage(base, 0, 0); drawMedia(g, L, els);
+      if(kind !== 'png') frames.push(cv.toDataURL('image/jpeg', 0.88));
     }
-    showExport(canvas);
-    alert('تم تجهيز الصورة. قم بتحميلها ثم أرفقها يدويًا في واتساب (سيتم فتح واتساب الآن).');
-    window.open('https://wa.me/?text=' + encodeURIComponent('برنامجك التدريبي من ZEDAM GYM 💪'), '_blank');
-  }, 'image/png');
+    let blob;
+    if(kind === 'png') blob = await new Promise(r => cv.toBlob(r, 'image/png'));
+    else{
+      st.textContent = 'جاري ترميز الـ GIF...';
+      const obj = await new Promise(res => gifshot.createGIF({images: frames, gifWidth: L.W, gifHeight: L.H, interval: 1 / fps,
+        sampleInterval: 10, numWorkers: 2, progressCallback: p => { st.textContent = 'جاري ترميز الـ GIF ' + Math.round(p * 100) + '%'; }}, res));
+      if(obj.error) throw new Error('فشل إنشاء الـ GIF');
+      blob = dataURLtoBlob(obj.image);
+    }
+    if(lastUrl) URL.revokeObjectURL(lastUrl);
+    lastBlob = blob; lastKind = kind; lastUrl = URL.createObjectURL(blob);
+    $('resultImg').src = lastUrl; $('downloadLink').href = lastUrl;
+    $('downloadLink').download = 'training-program.' + (kind === 'png' ? 'png' : 'gif');
+    $('resultWrap').style.display = 'block'; st.textContent = '';
+  }catch(e){ st.textContent = '⚠ ' + (e.message || 'حدث خطأ'); }
+  els.forEach(e => { if(e && e.tagName === 'VIDEO') e.remove(); });
+  busy = false;
+}
+function buildPreview(){
+  if(!program.length){ toast('أضف تمرينًا واحدًا على الأقل'); return; }
+  goTo('preview'); generate('gif');
+}
+async function shareResult(){
+  if(!lastBlob){ await generate('gif'); if(!lastBlob) return; }
+  const file = new File([lastBlob], 'training-program.' + (lastKind === 'png' ? 'png' : 'gif'), {type: lastBlob.type});
+  if(navigator.canShare && navigator.canShare({files: [file]})){
+    try{ await navigator.share({files: [file], title: 'برنامج تدريبي', text: 'برنامجك التدريبي من ZEDAM GYM 💪'}); return; }catch(e){}
+  }
+  alert('نزّل الملف من زر "تحميل" ثم أرفقه في واتساب (سيتم فتح واتساب الآن).');
+  window.open('https://wa.me/?text=' + encodeURIComponent('برنامجك التدريبي من ZEDAM GYM 💪'), '_blank');
 }
 
 if('serviceWorker' in navigator){
