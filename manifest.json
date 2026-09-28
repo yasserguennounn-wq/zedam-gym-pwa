@@ -5,7 +5,7 @@
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "000000#",
+  "background_color": "#000000",
   "theme_color": "#1f6feb",
   "lang": "ar",
   "dir": "rtl",
