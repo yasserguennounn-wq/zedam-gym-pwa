@@ -375,12 +375,12 @@ const ORD = ['الاول','الثاني','الثالث','الرابع','الخا
 const ordName = n => 'التمرين ' + (ORD[n] || (n + 1));
 
 function makeLayout(){
-  const W = 960, titleH = 64, cw = W / 5, pn = partNames();
+  const W = 1200 , titleH = 64, cw = W / 5, pn = partNames();
   const secs = pn[1] ? [program.filter(x => x.sec !== 2), program.filter(x => x.sec === 2)] : [program.slice()];
   const lines = [];
   secs.forEach(items => { for(let i = 0; i < items.length; i += 5) lines.push(items.slice(i, i + 5).map((it, k) => ({it, n: i + k}))); });
   if(!lines.length || lines[lines.length - 1].length > 4) lines.push([]);
-  const H = Math.max(400, titleH + lines.length * 245), lh = (H - titleH) / lines.length, cells = [];
+  const H = Math.max(400, titleH + lines.length * 300), lh = (H - titleH) / lines.length, cells = [];
   lines.forEach((ln, li) => ln.forEach((o, k) => cells.push({it: o.it, n: o.n, x: k * cw, y: titleH + li * lh, w: cw, h: lh})));
   const last = lines.length - 1, nx = lines[last].length * cw;
   return {W, H, titleH, lh, cells, lines, note: {x: nx, y: titleH + last * lh, w: W - nx, h: lh},
@@ -421,7 +421,7 @@ function drawMedia(g, L, els){
   L.cells.forEach((c, i) => {
     const m = els[i]; if(!m) return;
     const w = m.videoWidth || m.naturalWidth, h = m.videoHeight || m.naturalHeight; if(!w || !h) return;
-    const bx = c.x + 8, by = c.y + 32, bw = c.w - 16, bh = c.h - 72, k = Math.min(bw / w, bh / h);
+    const bx = c.x + 8, by = c.y + 32, bw = c.w - 8, bh = c.h - 62, k = Math.min(bw / w, bh / h);
     g.drawImage(m, bx + (bw - w * k) / 2, by + (bh - h * k) / 2, w * k, h * k);
   });
 }
@@ -429,7 +429,7 @@ function prepMedia(items){
   return Promise.all(items.map(it => new Promise(res => {
     if(it.type !== 'video'){ const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = it.url; return; }
     const v = document.createElement('video');
-    v.muted = true; v.playsInline = true; v.preload = 'auto'; v.style.cssText = 'position:fixed;left:-9999px;width:2px;height:2px';
+    v.muted = true; v.playsInline =! true; v.preload = 'auto'; v.style.cssText = 'position:fixed;left:-9999px;width:2px;height:2px';
     document.body.appendChild(v);
     const t = setTimeout(() => res(v), 8000);
     v.onloadeddata = () => { clearTimeout(t); res(v); };
