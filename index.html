@@ -157,10 +157,10 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
     <div class="chips" id="libChips"></div>
     <div class="btn secondary" onclick="toggleAddForm()">➕ إضافة تمرين</div>
     <div class="card" id="addExForm" style="display:none">
-      <label>اسم التمرين</label>
+      <label>اسم التمرين (اتركه فارغًا عند إضافة عدة تمارين لاستخدام اسم كل ملف)</label>
       <input type="text" id="libExName" placeholder="مثال: ضغط بنش مسطح">
-      <label>صورة GIF أو فيديو</label>
-      <input type="file" accept="image/*,video/*" id="libExFile">
+      <label>صورة GIF أو فيديو (يمكن اختيار عدة ملفات دفعة واحدة)</label>
+      <input type="file" accept="image/*,video/*" id="libExFile" multiple>
       <div class="btn" onclick="saveLibExercise()">حفظ في المكتبة</div>
     </div>
     <div class="lib-grid" id="libGrid"></div>
@@ -341,14 +341,20 @@ function renderLibGrid(){
     : `<div class="sub">لا توجد تمارين بعد في "${currentLibCat}"</div>`;
 }
 async function saveLibExercise(){
-  const name = $('libExName').value.trim(), f = $('libExFile').files[0];
-  if(!name){ toast('اكتب اسم التمرين'); return; }
-  if(!f){ toast('اختر فيديو أو صورة'); return; }
-  const type = typeOf(f);
-  await dbPut({id: ++uid, cat: currentLibCat, name, type, blob: f, thumb: await thumbOf(f, type)});
+  const typedName = $('libExName').value.trim(), files = Array.from($('libExFile').files);
+  if(!files.length){ toast('اختر فيديو أو صورة واحدة أو أكثر'); return; }
+  if(!typedName && files.length === 1){ toast('اكتب اسم التمرين'); return; }
+  for(let i = 0; i < files.length; i++){
+    const f = files[i];
+    const type = typeOf(f);
+    const name = typedName
+      ? (files.length > 1 ? `${typedName} ${i + 1}` : typedName)
+      : f.name.replace(/\.[^.]+$/, '');
+    await dbPut({id: ++uid, cat: currentLibCat, name, type, blob: f, thumb: await thumbOf(f, type)});
+  }
   await loadLib();
   $('libExName').value = ''; $('libExFile').value = ''; $('addExForm').style.display = 'none';
-  renderLibGrid(); toast('تمت الإضافة للمكتبة');
+  renderLibGrid(); toast(files.length > 1 ? `تمت إضافة ${files.length} تمارين للمكتبة` : 'تمت الإضافة للمكتبة');
 }
 async function deleteLib(id){ await dbDel(id); await loadLib(); renderLibGrid(); }
 
