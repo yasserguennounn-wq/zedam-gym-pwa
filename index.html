@@ -18,7 +18,7 @@
   box-sizing:border-box;
 }
 @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
-  --bg:#14161a; --card:#1e2127; --text:#f0f1f3; --muted:#9aa0aa; --border:#31353d; --note-bg:#16283f; --note-border:#28527f;
+  --bg:#000000; --card:#1e2127; --text:#ffffff; --muted:#ffffff; --border:#31353d; --note-bg:#16283f; --note-border:#28527f;
 }}
 *{box-sizing:border-box}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
@@ -29,7 +29,7 @@ body{margin:0;font-family:'Cairo',system-ui,sans-serif;background:var(--bg);colo
 h1{font-size:1.4rem;margin:.2rem 0}
 .logo{font-weight:800;font-size:1.6rem;color:var(--accent);text-align:center;margin-top:10px}
 .sub{color:var(--muted);text-align:center;margin-bottom:20px}
-.big-btn{display:block;width:100%;background:var(--card);border:2px dashed var(--accent);border-radius:16px;padding:26px 16px;text-align:center;font-size:1.15rem;font-weight:600;color:var(--accent);cursor:pointer;margin-top:24px}
+.big-btn{display:block;width:100%;background:var(--card);border:2px dashed var(--accent);border-radius:3px;padding:26px 16px;text-align:center;font-size:1.15rem;font-weight:600;color:#ffffff;cursor:pointer;margin-top:24px}
 .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:12px}
 label{display:block;font-size:.85rem;color:var(--muted);margin-bottom:4px}
 input[type=text],input[type=number],select{width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-family:inherit;font-size:.95rem;margin-bottom:10px}
@@ -40,9 +40,11 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 .gif-box{border:1px dashed var(--border);border-radius:10px;padding:8px;text-align:center;color:var(--muted);font-size:.85rem}
 .gif-box img{max-width:100%;max-height:110px;border-radius:8px;display:block;margin:0 auto 6px}
 .btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px;font-weight:700;font-size:1rem;width:100%;cursor:pointer;margin-top:6px}
-.btn.secondary{background:var(--card);color:var(--accent);border:1px solid var(--accent)}
+.btn.secondary{background:var(--card);color:#ffffff;border:1px solid var(--accent)}
 .btn.wa{background:#25D366}
 .nav{display:flex;gap:10px;margin-top:16px}
+.topbar{display:flex;align-items:center;margin-bottom:8px}
+.back-btn{font-size:1.3rem;line-height:1;cursor:pointer;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px 14px;margin-inline-end:8px}
 .nav .btn{margin-top:0}
 /* Poster preview */
 #poster{background:var(--card);border-radius:14px;overflow:hidden;border:1px solid var(--border)}
@@ -54,7 +56,7 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 .poster-ex .name{font-weight:700;font-size:.82rem}
 .poster-ex .sr{color:var(--muted);font-size:.78rem}
 .note{margin:14px;background:var(--note-bg);border:1px solid var(--note-border);border-radius:10px;padding:10px;font-size:.82rem}
-.poster-foot{text-align:center;padding:10px;font-weight:800;color:var(--accent);font-size:.9rem}
+.poster-foot{text-align:center;padding:10px;font-weight:800;color:#ffffff;font-size:.9rem}
 #exportImgWrap{display:none;margin-top:14px;text-align:center}
 #exportImgWrap img{max-width:100%;border-radius:10px;border:1px solid var(--border)}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
@@ -90,6 +92,7 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 
   <!-- Form -->
   <div class="screen" id="screen-form">
+    <div class="topbar"><span class="back-btn" onclick="goBack('form')">→</span></div>
     <h1>معلومات المتدرب</h1>
     <div class="card">
       <label>اسم المتدرب</label>
@@ -114,13 +117,13 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
     <div id="exSummary" class="sub" style="margin-top:10px"></div>
 
     <div class="nav">
-      <div class="btn secondary" onclick="goTo('home')">رجوع</div>
       <div class="btn" onclick="buildPreview()">معاينة البرنامج ➜</div>
     </div>
   </div>
 
   <!-- Exercises -->
   <div class="screen" id="screen-exercises">
+    <div class="topbar"><span class="back-btn" onclick="goBack('exercises')">→</span></div>
     <h1>تصميم البرنامج التدريبي</h1>
     <div class="add-row">
       <div class="btn" onclick="openPicker()">📚 من المكتبة</div>
@@ -134,6 +137,7 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 
   <!-- Preview -->
   <div class="screen" id="screen-preview">
+    <div class="topbar"><span class="back-btn" onclick="goBack('preview')">→</span></div>
     <h1>النتيجة</h1>
     <div id="genStatus" class="sub"></div>
     <div id="resultWrap" style="display:none;text-align:center">
@@ -148,6 +152,7 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 
   <!-- Library -->
   <div class="screen" id="screen-library">
+    <div class="topbar"><span class="back-btn" onclick="goBack('library')">→</span></div>
     <h1>📚 مكتبة التمارين</h1>
     <div class="chips" id="libChips"></div>
     <div class="btn secondary" onclick="toggleAddForm()">➕ إضافة تمرين</div>
@@ -159,9 +164,6 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
       <div class="btn" onclick="saveLibExercise()">حفظ في المكتبة</div>
     </div>
     <div class="lib-grid" id="libGrid"></div>
-    <div class="nav">
-      <div class="btn secondary" onclick="goTo('home')">رجوع</div>
-    </div>
   </div>
 
 </div>
@@ -189,6 +191,8 @@ let currentLibCat = CATEGORIES[0], pickCat = CATEGORIES[0];
 const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 const typeOf = f => f.type.startsWith('video/') ? 'video' : 'image';
 
+const BACK_MAP = {form:'home', exercises:'form', preview:'form', library:'home'};
+function goBack(n){ goTo(BACK_MAP[n] || 'home'); }
 function goTo(n){
   document.querySelectorAll('.screen').forEach(x => x.classList.remove('active'));
   $('screen-' + n).classList.add('active');
