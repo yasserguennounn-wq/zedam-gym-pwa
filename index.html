@@ -65,11 +65,22 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:10px}
 .chip{flex:0 0 auto;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:8px 14px;font-size:.85rem;font-family:inherit;cursor:pointer;color:var(--text)}
 .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-.lib-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.lib-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding-bottom:70px}
 .lib-item{position:relative;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:6px;text-align:center;cursor:pointer}
+.lib-item.selected{outline:2px solid var(--accent)}
 .lib-item img{width:100%;height:70px;object-fit:cover;border-radius:8px;margin-bottom:4px}
-.lib-item .name{font-size:.72rem;font-weight:600}
+.lib-item .name{font-size:.72rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lib-item .del{width:22px;height:22px;font-size:.7rem;top:4px;left:4px;position:absolute}
+.lib-item .fav{position:absolute;top:4px;right:4px;font-size:.9rem;background:rgba(0,0,0,.55);border-radius:6px;padding:0 4px;cursor:pointer;line-height:1.4}
+.lib-item .dup{position:absolute;bottom:22px;left:4px;font-size:.65rem;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:6px;padding:1px 5px;cursor:pointer}
+.lib-item .uses{position:absolute;bottom:22px;right:4px;font-size:.62rem;background:rgba(0,0,0,.6);color:#fff;border-radius:6px;padding:1px 5px}
+.lib-item .check{position:absolute;top:4px;left:4px;width:18px;height:18px}
+.lib-toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.lib-toolbar input,.lib-toolbar select{margin-bottom:0}
+.lib-toolbar .btn{width:auto;flex:1;min-width:100px;margin-top:0;font-size:.8rem;padding:9px}
+.bulk-bar{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--border);padding:10px 16px;display:none;gap:8px;z-index:60;align-items:center;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px))}
+.bulk-bar select{margin-bottom:0;flex:1}
+.bulk-bar .btn{width:auto;flex:0 0 auto;margin-top:0;padding:9px 14px}
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:50;align-items:flex-end;justify-content:center}
 .modal{background:var(--bg);width:100%;max-width:640px;max-height:80vh;overflow-y:auto;border-radius:18px 18px 0 0;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
 
@@ -166,6 +177,27 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
       <input type="file" accept="image/*,video/*" id="libExFile" multiple>
       <div class="btn" onclick="saveLibExercise()">حفظ في المكتبة</div>
     </div>
+
+    <div class="lib-toolbar">
+      <input type="text" id="libSearchInput" placeholder="🔍 بحث بالاسم" style="flex:2;min-width:140px" oninput="libSearch=this.value;renderLibGrid()">
+      <select id="libTypeFilter" onchange="libTypeFilter=this.value;renderLibGrid()">
+        <option value="all">كل الأنواع</option>
+        <option value="video">🎬 فيديو فقط</option>
+        <option value="image">🖼 صورة فقط</option>
+      </select>
+      <select id="libSortSelect" onchange="libSort=this.value;renderLibGrid()">
+        <option value="new">الأحدث</option>
+        <option value="name">الاسم (أ-ي)</option>
+        <option value="uses">الأكثر استخدامًا</option>
+      </select>
+    </div>
+    <div class="lib-toolbar">
+      <div class="btn secondary" id="selectModeBtn" onclick="toggleSelectMode()">☑ تحديد</div>
+      <div class="btn secondary" onclick="exportLibrary()">⬇ نسخة احتياطية</div>
+      <div class="btn secondary" onclick="$('importLibFile').click()">⬆ استيراد</div>
+      <input type="file" id="importLibFile" accept="application/json" hidden onchange="importLibrary(this)">
+    </div>
+
     <div class="lib-grid" id="libGrid"></div>
   </div>
 
@@ -183,14 +215,46 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
   </div>
 </div>
 
+<!-- Preview modal -->
+<div class="modal-overlay" id="previewModal">
+  <div class="modal" style="text-align:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <h1 id="previewName" style="margin:0;font-size:1.05rem"></h1>
+      <button class="del" style="position:static" onclick="closePreview()">✕</button>
+    </div>
+    <div id="previewMedia"></div>
+  </div>
+</div>
+
+<!-- Bulk selection bar -->
+<div class="bulk-bar" id="bulkBar">
+  <span id="bulkCount" style="font-size:.85rem;white-space:nowrap"></span>
+  <select id="bulkMoveTarget"></select>
+  <div class="btn secondary" onclick="bulkMove()">نقل</div>
+  <div class="btn" style="background:#e5484d" onclick="bulkDelete()">حذف</div>
+</div>
+
 <div id="toast"></div>
 <script>
 const COMMON = ["ضغط بنش","سكوات","سحب علوي","ديدليفت","كتف بار","بايسبس بار","ترايسبس حبل","بطن معلق","بلانك","بريس كتف دامبل","أخرى (كتابة يدوية)"];
 const PROGRAM_NAMES = ["صدر بايسبس بطن","ظهر ترايسبس","أكتاف بطن","بايسبس ترايسبس","أرجل بطن","عضلات ياسر بطن","سواعد","PPL","LEG","أخرى (كتابة يدوية)"];
-const CATEGORIES = ["صدر","ظهر","أكتاف","بايسبس","ترايسبس","أرجل","بطن","ترابيس","كارديو"];
+const BUILTIN_CATEGORIES = ["صدر","ظهر","أكتاف","بايسبس","ترايسبس","أرجل","بطن","ترابيس","كارديو"];
+function loadCustomCats(){ try{ return JSON.parse(localStorage.getItem('zedamCustomCats') || '[]'); }catch(e){ return []; } }
+function saveCustomCats(a){ localStorage.setItem('zedamCustomCats', JSON.stringify(a)); }
+let CATEGORIES = [...BUILTIN_CATEGORIES, ...loadCustomCats()];
 const $ = id => document.getElementById(id);
 let program = [], libCache = [], uid = Date.now(), _t;
 let currentLibCat = CATEGORIES[0], pickCat = CATEGORIES[0];
+let libSearch = '', libTypeFilter = 'all', libSort = 'new';
+let selectMode = false, selectedIds = new Set(), _previewUrl = null;
+function addCustomCategory(){
+  const name = prompt('اسم التصنيف الجديد:'); if(!name) return;
+  const n = name.trim();
+  if(!n){ return; }
+  if(CATEGORIES.includes(n)){ toast('هذا التصنيف موجود بالفعل'); return; }
+  const custom = loadCustomCats(); custom.push(n); saveCustomCats(custom);
+  CATEGORIES.push(n); currentLibCat = n; renderLibChips(); renderLibGrid();
+}
 const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 const typeOf = f => f.type.startsWith('video/') ? 'video' : 'image';
 
@@ -201,7 +265,7 @@ function goTo(n){
   $('screen-' + n).classList.add('active');
   if(n === 'exercises') renderProgram();
   if(n === 'form') renderSummary();
-  if(n === 'library'){ renderLibChips(); renderLibGrid(); }
+  if(n === 'library'){ selectMode = false; selectedIds.clear(); renderLibChips(); renderLibGrid(); renderBulkBar(); }
   window.scrollTo(0,0);
 }
 function toast(m){
@@ -331,51 +395,170 @@ function renderSummary(){
 function libItemHTML(it, click, del){
   return `<div class="lib-item" ${click ? `onclick="${click}"` : ''}>
     ${del ? `<button class="del" onclick="event.stopPropagation();${del}">✕</button>` : ''}
-    ${it.thumb ? `<img src="${it.thumb}">` : '<div class="nothumb">🎬</div>'}
+    ${it.thumb ? `<img src="${it.thumb}" alt="${esc(it.name)}">` : '<div class="nothumb">🎬</div>'}
     ${it.type === 'video' ? '<span class="play">▶</span>' : ''}
     <div class="name">${esc(it.name)}</div></div>`;
 }
 function renderLibChips(){
-  $('libChips').innerHTML = CATEGORIES.map(c => `<button class="chip ${c === currentLibCat ? 'active' : ''}" onclick="selectLibCat('${c}')">${c}</button>`).join('');
+  $('libChips').innerHTML = CATEGORIES.map(c => `<button class="chip ${c === currentLibCat ? 'active' : ''}" data-cat="${esc(c)}" onclick="selectLibCat(this.dataset.cat)">${esc(c)}</button>`).join('')
+    + `<button class="chip" type="button" onclick="addCustomCategory()">+ تصنيف</button>`;
 }
 function selectLibCat(c){ currentLibCat = c; renderLibChips(); renderLibGrid(); }
 function toggleAddForm(){ const f = $('addExForm'); f.style.display = f.style.display === 'none' ? 'block' : 'none'; }
-function renderLibGrid(){
-  const items = libCache.filter(x => x.cat === currentLibCat);
-  $('libGrid').innerHTML = items.length ? items.map(it => libItemHTML(it, '', `deleteLib(${it.id})`)).join('')
-    : `<div class="sub">لا توجد تمارين بعد في "${currentLibCat}"</div>`;
+
+function libraryCardHTML(it){
+  const sel = selectedIds.has(it.id);
+  return `<div class="lib-item ${sel ? 'selected' : ''}" onclick="onLibCardClick(${it.id})">
+    ${selectMode
+      ? `<input type="checkbox" class="check" ${sel ? 'checked' : ''} onclick="event.stopPropagation();toggleSelect(${it.id})">`
+      : `<button class="del" onclick="event.stopPropagation();deleteLib(${it.id})">✕</button>`}
+    <span class="fav" onclick="event.stopPropagation();toggleFav(${it.id})">${it.fav ? '⭐' : '☆'}</span>
+    ${it.thumb ? `<img src="${it.thumb}" alt="${esc(it.name)}">` : '<div class="nothumb">🎬</div>'}
+    ${it.type === 'video' ? '<span class="play">▶</span>' : ''}
+    <button class="dup" onclick="event.stopPropagation();duplicateLib(${it.id})">⧉ نسخ</button>
+    ${it.uses ? `<span class="uses">×${it.uses}</span>` : ''}
+    <div class="name">${esc(it.name)}</div></div>`;
 }
+function renderLibGrid(){
+  let items = libCache.filter(x => x.cat === currentLibCat);
+  if(libTypeFilter !== 'all') items = items.filter(x => x.type === libTypeFilter);
+  const q = libSearch.trim().toLowerCase();
+  if(q) items = items.filter(x => x.name.toLowerCase().includes(q));
+  items = items.slice();
+  if(libSort === 'name') items.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+  else if(libSort === 'uses') items.sort((a, b) => (b.uses || 0) - (a.uses || 0));
+  else items.sort((a, b) => b.id - a.id);
+  items.sort((a, b) => (b.fav ? 1 : 0) - (a.fav ? 1 : 0));
+  $('libGrid').innerHTML = items.length ? items.map(libraryCardHTML).join('')
+    : `<div class="sub">لا توجد تمارين مطابقة في "${esc(currentLibCat)}"</div>`;
+}
+function onLibCardClick(id){ selectMode ? toggleSelect(id) : openLibPreview(id); }
+
+/* التحديد الجماعي */
+function toggleSelectMode(){
+  selectMode = !selectMode; selectedIds.clear();
+  $('selectModeBtn').textContent = selectMode ? '✖ إلغاء التحديد' : '☑ تحديد';
+  renderLibGrid(); renderBulkBar();
+}
+function toggleSelect(id){ selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id); renderLibGrid(); renderBulkBar(); }
+function renderBulkBar(){
+  const bar = $('bulkBar');
+  if(!selectMode || !selectedIds.size){ bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  $('bulkCount').textContent = selectedIds.size + ' محدد';
+  $('bulkMoveTarget').innerHTML = CATEGORIES.map(c => `<option value="${esc(c)}" ${c === currentLibCat ? 'selected' : ''}>${esc(c)}</option>`).join('');
+}
+async function bulkDelete(){
+  if(!confirm(`حذف ${selectedIds.size} تمرين؟ لا يمكن التراجع عن هذا.`)) return;
+  for(const id of selectedIds) await dbDel(id);
+  selectedIds.clear(); await loadLib(); renderLibGrid(); renderBulkBar(); toast('تم الحذف');
+}
+async function bulkMove(){
+  const target = $('bulkMoveTarget').value;
+  for(const id of selectedIds){ const it = libCache.find(x => x.id === id); if(it){ it.cat = target; await dbPut(it); } }
+  selectedIds.clear(); await loadLib(); renderLibGrid(); renderBulkBar(); toast('تم النقل إلى ' + target);
+}
+
+/* مفضلة / نسخ */
+async function toggleFav(id){
+  const it = libCache.find(x => x.id === id); if(!it) return;
+  it.fav = !it.fav; await dbPut(it); await loadLib(); renderLibGrid();
+}
+async function duplicateLib(id){
+  const it = libCache.find(x => x.id === id); if(!it) return;
+  await dbPut({id: ++uid, cat: it.cat, name: it.name + ' (نسخة)', type: it.type, blob: it.blob, thumb: it.thumb, fav: false, uses: 0});
+  await loadLib(); renderLibGrid(); toast('تم إنشاء نسخة');
+}
+
+/* معاينة كبيرة */
+function openLibPreview(id){
+  const it = libCache.find(x => x.id === id); if(!it) return;
+  $('previewName').textContent = it.name;
+  if(_previewUrl) URL.revokeObjectURL(_previewUrl);
+  const url = URL.createObjectURL(it.blob); _previewUrl = url;
+  $('previewMedia').innerHTML = it.type === 'video'
+    ? `<video src="${url}" controls autoplay muted loop playsinline style="max-width:100%;border-radius:10px"></video>`
+    : `<img src="${url}" alt="${esc(it.name)}" style="max-width:100%;border-radius:10px">`;
+  $('previewModal').style.display = 'flex';
+}
+function closePreview(){
+  if(_previewUrl){ URL.revokeObjectURL(_previewUrl); _previewUrl = null; }
+  $('previewModal').style.display = 'none'; $('previewMedia').innerHTML = '';
+}
+
 async function saveLibExercise(){
   const typedName = $('libExName').value.trim(), files = Array.from($('libExFile').files);
   if(!files.length){ toast('اختر فيديو أو صورة واحدة أو أكثر'); return; }
   if(!typedName && files.length === 1){ toast('اكتب اسم التمرين'); return; }
-  for(let i = 0; i < files.length; i++){
-    const f = files[i];
-    const type = typeOf(f);
-    const name = typedName
-      ? (files.length > 1 ? `${typedName} ${i + 1}` : typedName)
-      : f.name.replace(/\.[^.]+$/, '');
-    await dbPut({id: ++uid, cat: currentLibCat, name, type, blob: f, thumb: await thumbOf(f, type)});
-  }
-  await loadLib();
-  $('libExName').value = ''; $('libExFile').value = ''; $('addExForm').style.display = 'none';
-  renderLibGrid(); toast(files.length > 1 ? `تمت إضافة ${files.length} تمارين للمكتبة` : 'تمت الإضافة للمكتبة');
+  try{
+    for(let i = 0; i < files.length; i++){
+      const f = files[i];
+      const type = typeOf(f);
+      const name = typedName
+        ? (files.length > 1 ? `${typedName} ${i + 1}` : typedName)
+        : f.name.replace(/\.[^.]+$/, '');
+      await dbPut({id: ++uid, cat: currentLibCat, name, type, blob: f, thumb: await thumbOf(f, type), fav: false, uses: 0});
+    }
+    await loadLib();
+    $('libExName').value = ''; $('libExFile').value = ''; $('addExForm').style.display = 'none';
+    renderLibGrid(); toast(files.length > 1 ? `تمت إضافة ${files.length} تمارين للمكتبة` : 'تمت الإضافة للمكتبة');
+  }catch(e){ toast('تعذّر الحفظ، تحقق من مساحة التخزين المتوفرة'); }
 }
-async function deleteLib(id){ await dbDel(id); await loadLib(); renderLibGrid(); }
+async function deleteLib(id){
+  if(!confirm('حذف هذا التمرين من المكتبة؟')) return;
+  await dbDel(id); await loadLib(); renderLibGrid();
+}
+
+/* نسخ احتياطي / استيراد */
+function blobToDataURL(b){ return new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); }); }
+async function exportLibrary(){
+  if(!libCache.length){ toast('المكتبة فارغة'); return; }
+  toast('جاري تجهيز النسخة الاحتياطية...');
+  const out = [];
+  for(const it of libCache){
+    const data = await blobToDataURL(it.blob);
+    out.push({cat: it.cat, name: it.name, type: it.type, fav: !!it.fav, uses: it.uses || 0, data});
+  }
+  const payload = {app: 'ZEDAM GYM', version: 1, categories: CATEGORIES, items: out};
+  const blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'zedam-gym-library-backup.json'; a.click();
+  URL.revokeObjectURL(url);
+  toast('تم إنشاء النسخة الاحتياطية');
+}
+async function importLibrary(input){
+  const f = input.files[0]; input.value = ''; if(!f) return;
+  try{
+    const payload = JSON.parse(await f.text());
+    if(!payload.items) throw new Error('bad file');
+    if(payload.categories){
+      const custom = loadCustomCats();
+      payload.categories.forEach(c => { if(!CATEGORIES.includes(c)){ CATEGORIES.push(c); custom.push(c); } });
+      saveCustomCats(custom);
+    }
+    for(const it of payload.items){
+      const blob = dataURLtoBlob(it.data);
+      await dbPut({id: ++uid, cat: it.cat, name: it.name, type: it.type, blob, thumb: await thumbOf(blob, it.type), fav: !!it.fav, uses: it.uses || 0});
+    }
+    await loadLib(); renderLibChips(); renderLibGrid();
+    toast(`تم استيراد ${payload.items.length} تمرين`);
+  }catch(e){ toast('فشل الاستيراد، تأكد أن الملف نسخة احتياطية صالحة'); }
+}
 
 /* اختيار تمرين من المكتبة */
 function openPicker(){ $('importModal').style.display = 'flex'; renderPicker(); }
 function closeImport(){ $('importModal').style.display = 'none'; }
 function setPick(c){ pickCat = c; renderPicker(); }
 function renderPicker(){
-  $('importChips').innerHTML = CATEGORIES.map(c => `<button class="chip ${c === pickCat ? 'active' : ''}" onclick="setPick('${c}')">${c}</button>`).join('');
+  $('importChips').innerHTML = CATEGORIES.map(c => `<button class="chip ${c === pickCat ? 'active' : ''}" data-cat="${esc(c)}" onclick="setPick(this.dataset.cat)">${esc(c)}</button>`).join('');
   const items = libCache.filter(x => x.cat === pickCat);
   $('importGrid').innerHTML = items.length ? items.map(it => libItemHTML(it, `pickLib(${it.id})`, '')).join('')
-    : `<div class="sub">لا توجد تمارين في "${pickCat}"</div>`;
+    : `<div class="sub">لا توجد تمارين في "${esc(pickCat)}"</div>`;
 }
-function pickLib(id){
+async function pickLib(id){
   const it = libCache.find(x => x.id === id); if(!it) return;
   addItem({name: it.name, type: it.type, blob: it.blob, thumb: it.thumb});
+  it.uses = (it.uses || 0) + 1; await dbPut(it); await loadLib();
   renderProgram(); toast('تمت إضافة: ' + it.name);
 }
 
