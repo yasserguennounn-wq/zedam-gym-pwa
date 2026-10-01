@@ -122,6 +122,10 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
       <label>عنوان البرنامج - الجزء الثاني (اختياري)</label>
       <select id="progTitleSelect2" onchange="toggleTitleCustom(2, this.value)"></select>
       <input type="text" id="progTitleCustom2" placeholder="اكتب اسم البرنامج" style="display:none">
+
+      <label>عنوان البرنامج - الجزء الثالث (اختياري)</label>
+      <select id="progTitleSelect3" onchange="toggleTitleCustom(3, this.value)"></select>
+      <input type="text" id="progTitleCustom3" placeholder="اكتب اسم البرنامج" style="display:none">
       <label>ملاحظة تظهر في الصورة</label>
       <input type="text" id="traineeNote" value="الاحماء جيدا من 5 الى 10 دقائق">
     </div>
@@ -279,6 +283,7 @@ function fillProgramSelects(){
   const o = PROGRAM_NAMES.map(p => `<option value="${p}">${p}</option>`).join('');
   $('progTitleSelect1').innerHTML = o;
   $('progTitleSelect2').innerHTML = '<option value="">بدون</option>' + o;
+  $('progTitleSelect3').innerHTML = '<option value="">بدون</option>' + o;
 }
 function toggleTitleCustom(n, val){ $('progTitleCustom' + n).style.display = val.startsWith('أخرى') ? 'block' : 'none'; }
 fillProgramSelects();
@@ -360,7 +365,7 @@ async function addFromPhone(input){
   renderProgram(); toast('تمت إضافة ' + files.length + ' تمرين');
 }
 function renderProgram(){
-  const box = $('progList'), pn = partNames(), two = !!pn[1];
+  const box = $('progList'), act = activeParts();
   if(!program.length){ box.innerHTML = '<div class="sub">لم تضف أي تمرين بعد</div>'; return; }
   box.innerHTML = program.map((it, i) => `
     <div class="card ex-card">
@@ -374,7 +379,7 @@ function renderProgram(){
       <div class="media">${mediaHTML(it, i)}</div>
       <label>اسم التمرين (اكتب أو اختر)</label>
       <input type="text" list="exNames" value="${esc(it.name)}" oninput="program[${i}].name=this.value" style="font-size:.85rem">
-      ${two ? `<label>القسم في الصورة</label><div class="row2"><div class="chip ${it.sec === 2 ? '' : 'active'}" style="text-align:center" onclick="setSec(${i},1)">${esc(pn[0])}</div><div class="chip ${it.sec === 2 ? 'active' : ''}" style="text-align:center" onclick="setSec(${i},2)">${esc(pn[1])}</div></div>` : ''}
+      ${act.length > 1 ? `<label>القسم في الصورة</label><div class="row2">${act.map(p => `<div class="chip ${it.sec === p.idx ? 'active' : ''}" style="text-align:center" onclick="setSec(${i},${p.idx})">${esc(p.name)}</div>`).join('')}</div>` : ''}
       <div class="row2">
         <div><label>المجموعات</label><input type="number" value="${esc(it.sets)}" oninput="program[${i}].sets=this.value"></div>
         <div><label>التكرارات</label><input type="number" value="${esc(it.reps)}" oninput="program[${i}].reps=this.value"></div>
@@ -564,25 +569,50 @@ async function pickLib(id){
 
 /* أجزاء العنوان وترتيب الصورة */
 function partNames(){
-  let p1 = $('progTitleSelect1').value; if(p1.startsWith('أخرى')) p1 = $('progTitleCustom1').value || '';
-  let p2 = $('progTitleSelect2').value; if(p2.startsWith('أخرى')) p2 = $('progTitleCustom2').value || '';
-  return [p1.trim(), p2.trim()];
+  return [1, 2, 3].map(n => {
+    let v = $('progTitleSelect' + n).value;
+    if(v.startsWith('أخرى')) v = $('progTitleCustom' + n).value || '';
+    return v.trim();
+  });
+}
+/* الأقسام الفعّالة (التي لها اسم)، كل قسم يحمل رقمه الأصلي (1/2/3) ليُستخدم كقيمة sec */
+function activeParts(){
+  return partNames().map((name, i) => ({name, idx: i + 1})).filter(p => p.name);
 }
 function setSec(i, v){ program[i].sec = v; renderProgram(); }
 const ORD = ['الاول','الثاني','الثالث','الرابع','الخامس','السادس','السابع','الثامن','التاسع','العاشر'];
 const ordName = n => 'التمرين ' + (ORD[n] || (n + 1));
 
 function makeLayout(){
-  const W = 1200 , titleH = 64, cw = W / 5, pn = partNames();
-  const secs = pn[1] ? [program.filter(x => x.sec !== 2), program.filter(x => x.sec === 2)] : [program.slice()];
-  const lines = [];
-  secs.forEach(items => { for(let i = 0; i < items.length; i += 5) lines.push(items.slice(i, i + 5).map((it, k) => ({it, n: i + k}))); });
-  if(!lines.length || lines[lines.length - 1].length > 4) lines.push([]);
-  const H = Math.max(400, titleH + lines.length * 300), lh = (H - titleH) / lines.length, cells = [];
-  lines.forEach((ln, li) => ln.forEach((o, k) => cells.push({it: o.it, n: o.n, x: k * cw, y: titleH + li * lh, w: cw, h: lh})));
-  const last = lines.length - 1, nx = lines[last].length * cw;
-  return {W, H, titleH, lh, cells, lines, note: {x: nx, y: titleH + last * lh, w: W - nx, h: lh},
-          title: 'برنامج تمرين ' + pn.filter(Boolean).join(' ')};
+  const W = 1200, titleH = 64, secH = 42, cw = W / 5, rowH = 300;
+  let act = activeParts(); if(!act.length) act = [{name: '', idx: 1}];
+  const assigned = new Set(act.map(a => a.idx));
+  const residual = program.filter(x => !assigned.has(x.sec));
+  const groups = act.map(a => ({name: a.name, items: program.filter(x => x.sec === a.idx)}));
+  if(residual.length) groups[0].items = groups[0].items.concat(residual);
+  const showHeaders = act.length > 1;
+
+  let y = titleH, cells = [], blocks = [];
+  groups.forEach(gr => {
+    if(!gr.items.length) return;
+    if(showHeaders){ blocks.push({y, h: secH, name: gr.name}); y += secH; }
+    for(let i = 0; i < gr.items.length; i += 5){
+      const row = gr.items.slice(i, i + 5);
+      row.forEach((it, k) => cells.push({it, n: i + k, x: k * cw, y, w: cw, h: rowH}));
+      y += rowH;
+    }
+  });
+
+  let noteX, noteY, noteW;
+  if(cells.length){
+    const lastY = cells[cells.length - 1].y, lastCount = cells.filter(c => c.y === lastY).length;
+    if(lastCount < 5){ noteX = lastCount * cw; noteY = lastY; noteW = W - noteX; }
+    else { noteX = 0; noteY = y; noteW = W; y += rowH; }
+  } else { noteX = 0; noteY = y; noteW = W; y += rowH; }
+
+  const H = Math.max(400, y);
+  return {W, H, titleH, cells, blocks, note: {x: noteX, y: noteY, w: noteW, h: rowH},
+          title: 'برنامج تمرين ' + act.map(a => a.name).filter(Boolean).join(' ')};
 }
 function drawBase(L, logo){
   const c = document.createElement('canvas'); c.width = L.W; c.height = L.H;
@@ -594,8 +624,14 @@ function drawBase(L, logo){
   g.font = '800 32px Cairo, sans-serif'; g.fillText(L.title, L.W / 2, L.titleH / 2 + 2);
   const nm = $('traineeName').value.trim();
   if(nm){ g.font = '600 15px Cairo, sans-serif'; g.textAlign = 'left'; g.fillText(nm, 14, L.titleH / 2); g.textAlign = 'center'; }
+  const PALETTE = ['#f0daa3', '#bcd9ff', '#f6c9c9'];
+  L.blocks.forEach((b, i) => {
+    g.fillStyle = PALETTE[i % PALETTE.length]; g.fillRect(0, b.y, L.W, b.h);
+    g.fillStyle = '#1b1b1b'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.direction = 'rtl';
+    g.font = '800 22px Cairo, sans-serif'; g.fillText(b.name, L.W / 2, b.y + b.h / 2 + 1);
+  });
   g.fillStyle = '#111';
-  for(let i = 0; i < L.lines.length; i++) g.fillRect(0, L.titleH + i * L.lh - 1, L.W, 2);
+  [...new Set(L.cells.map(c => c.y))].forEach(y => g.fillRect(0, y - 1, L.W, 2));
   L.cells.forEach(c => {
     g.fillStyle = '#111'; g.direction = 'rtl'; g.font = '800 17px Cairo, sans-serif';
     g.fillText(ordName(c.n), c.x + c.w / 2, c.y + 20);
