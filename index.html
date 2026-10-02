@@ -102,6 +102,7 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
     <div class="sub">مصمم البرامج التدريبية</div>
     <div class="big-btn" onclick="goTo('form')">➕ تصميم برنامج تدريبي</div>
     <div class="big-btn" onclick="goTo('library'); renderLibChips(); renderLibGrid();" style="border-color:var(--accent2);color:#b8860b">📚 مكتبة التمارين</div>
+    <div class="big-btn" onclick="goTo('templates')" style="border-color:#8a7bd1">📂 القوالب</div>
   </div>
 
   <!-- Form -->
@@ -150,7 +151,17 @@ input[type=text],input[type=number],select{width:100%;padding:10px;border:1px so
     <input type="file" id="phoneFile" accept="video/*,image/*" multiple hidden onchange="addFromPhone(this)">
     <datalist id="exNames"></datalist>
     <div id="progList" style="margin-top:14px"></div>
-    <div class="btn" onclick="goTo('form')">✔ تم</div>
+    <div class="row2">
+      <div class="btn secondary" onclick="saveAsTemplate()">💾 حفظ كقالب</div>
+      <div class="btn" onclick="goTo('form')">✔ تم</div>
+    </div>
+  </div>
+
+  <!-- Templates -->
+  <div class="screen" id="screen-templates">
+    <div class="topbar"><span class="back-btn" onclick="goBack('templates')">→</span></div>
+    <h1>📂 القوالب</h1>
+    <div id="tplList" style="margin-top:10px"></div>
   </div>
 
   <!-- Preview -->
@@ -262,7 +273,7 @@ function addCustomCategory(){
 const esc = s => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 const typeOf = f => f.type.startsWith('video/') ? 'video' : 'image';
 
-const BACK_MAP = {form:'home', exercises:'form', preview:'form', library:'home'};
+const BACK_MAP = {form:'home', exercises:'form', preview:'form', library:'home', templates:'home'};
 function goBack(n){ goTo(BACK_MAP[n] || 'home'); }
 function goTo(n){
   document.querySelectorAll('.screen').forEach(x => x.classList.remove('active'));
@@ -270,6 +281,7 @@ function goTo(n){
   if(n === 'exercises') renderProgram();
   if(n === 'form') renderSummary();
   if(n === 'library'){ selectMode = false; selectedIds.clear(); renderLibChips(); renderLibGrid(); renderBulkBar(); }
+  if(n === 'templates'){ renderTemplates(); }
   window.scrollTo(0,0);
 }
 function toast(m){
@@ -517,14 +529,15 @@ async function deleteLib(id){
 /* نسخ احتياطي / استيراد */
 function blobToDataURL(b){ return new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); }); }
 async function exportLibrary(){
-  if(!libCache.length){ toast('المكتبة فارغة'); return; }
+  const tpls = loadTemplates();
+  if(!libCache.length && !tpls.length){ toast('لا توجد مكتبة أو قوالب لنسخها'); return; }
   toast('جاري تجهيز النسخة الاحتياطية...');
   const out = [];
   for(const it of libCache){
     const data = await blobToDataURL(it.blob);
-    out.push({cat: it.cat, name: it.name, type: it.type, fav: !!it.fav, uses: it.uses || 0, data});
+    out.push({id: it.id, cat: it.cat, name: it.name, type: it.type, fav: !!it.fav, uses: it.uses || 0, data});
   }
-  const payload = {app: 'ZEDAM GYM', version: 1, categories: CATEGORIES, items: out};
+  const payload = {app: 'ZEDAM GYM', version: 2, categories: CATEGORIES, items: out, templates: tpls};
   const blob = new Blob([JSON.stringify(payload)], {type: 'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = 'zedam-gym-library-backup.json'; a.click();
@@ -541,12 +554,24 @@ async function importLibrary(input){
       payload.categories.forEach(c => { if(!CATEGORIES.includes(c)){ CATEGORIES.push(c); custom.push(c); } });
       saveCustomCats(custom);
     }
+    const idMap = {};
     for(const it of payload.items){
       const blob = dataURLtoBlob(it.data);
-      await dbPut({id: ++uid, cat: it.cat, name: it.name, type: it.type, blob, thumb: await thumbOf(blob, it.type), fav: !!it.fav, uses: it.uses || 0});
+      const newId = ++uid;
+      if(it.id != null) idMap[it.id] = newId;
+      await dbPut({id: newId, cat: it.cat, name: it.name, type: it.type, blob, thumb: await thumbOf(blob, it.type), fav: !!it.fav, uses: it.uses || 0});
     }
     await loadLib(); renderLibChips(); renderLibGrid();
-    toast(`تم استيراد ${payload.items.length} تمرين`);
+    let tplCount = 0;
+    if(Array.isArray(payload.templates) && payload.templates.length){
+      const list = loadTemplates();
+      payload.templates.forEach(t => {
+        const items = t.items.map(it => ({...it, libId: it.libId != null && idMap[it.libId] != null ? idMap[it.libId] : null}));
+        list.push({id: ++uid, name: t.name, titleParts: t.titleParts, items, createdAt: t.createdAt || Date.now()});
+      });
+      saveTemplates(list); tplCount = payload.templates.length;
+    }
+    toast(`تم استيراد ${payload.items.length} تمرين` + (tplCount ? ` و ${tplCount} قالب` : ''));
   }catch(e){ toast('فشل الاستيراد، تأكد أن الملف نسخة احتياطية صالحة'); }
 }
 
@@ -562,9 +587,74 @@ function renderPicker(){
 }
 async function pickLib(id){
   const it = libCache.find(x => x.id === id); if(!it) return;
-  addItem({name: it.name, type: it.type, blob: it.blob, thumb: it.thumb});
+  addItem({name: it.name, type: it.type, blob: it.blob, thumb: it.thumb, libId: it.id});
   it.uses = (it.uses || 0) + 1; await dbPut(it); await loadLib();
   renderProgram(); toast('تمت إضافة: ' + it.name);
+}
+
+/* القوالب (محفوظة محليًا بلا ارتباط بمتدرب) */
+function loadTemplates(){ try{ return JSON.parse(localStorage.getItem('zedamTemplates') || '[]'); }catch(e){ return []; } }
+function saveTemplates(list){ localStorage.setItem('zedamTemplates', JSON.stringify(list)); }
+
+async function saveAsTemplate(){
+  if(!program.length){ toast('أضف تمارين أولاً قبل الحفظ كقالب'); return; }
+  const name = prompt('اسم القالب (مثال: برنامج مبتدئين - صدر بايسبس بطن):');
+  if(!name || !name.trim()) return;
+  const items = program.map(it => {
+    const base = {name: it.name, type: it.type, sets: it.sets, reps: it.reps, sec: it.sec, libId: it.libId || null};
+    if(!base.libId && it.thumb) base.thumb = it.thumb;
+    return base;
+  });
+  const list = loadTemplates();
+  list.push({id: ++uid, name: name.trim(), titleParts: partNames(), items, createdAt: Date.now()});
+  saveTemplates(list);
+  toast('تم حفظ القالب');
+}
+
+function renderTemplates(){
+  const list = loadTemplates(), box = $('tplList');
+  if(!list.length){ box.innerHTML = '<div class="sub">لا توجد قوالب محفوظة بعد. افتح "تصميم البرنامج التدريبي" ثم اضغط "💾 حفظ كقالب".</div>'; return; }
+  box.innerHTML = list.slice().sort((a, b) => b.createdAt - a.createdAt).map(t => `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div>
+          <div style="font-weight:700">${esc(t.name)}</div>
+          <div class="sub" style="margin:2px 0 0">${t.items.length} تمرين · ${esc(t.titleParts.filter(Boolean).join(' / ') || 'بدون عنوان')}</div>
+        </div>
+        <button onclick="deleteTemplate(${t.id})" style="flex:0 0 auto;background:#e5484d;color:#fff;border:none;border-radius:8px;width:30px;height:30px;font-weight:700;cursor:pointer">✕</button>
+      </div>
+      <div class="btn" style="margin-top:10px" onclick="useTemplate(${t.id})">استخدام القالب لمتدرب جديد</div>
+    </div>`).join('');
+}
+
+function deleteTemplate(id){
+  if(!confirm('حذف هذا القالب؟')) return;
+  saveTemplates(loadTemplates().filter(t => t.id !== id));
+  renderTemplates();
+}
+
+function setTitleFromTemplate(n, val){
+  const sel = $('progTitleSelect' + n);
+  if(!val){ if(n !== 1) sel.value = ''; toggleTitleCustom(n, ''); return; }
+  if(PROGRAM_NAMES.includes(val)){ sel.value = val; toggleTitleCustom(n, val); }
+  else{ sel.value = 'أخرى (كتابة يدوية)'; $('progTitleCustom' + n).value = val; toggleTitleCustom(n, 'أخرى (كتابة يدوية)'); }
+}
+
+async function useTemplate(id){
+  const tpl = loadTemplates().find(t => t.id === id); if(!tpl) return;
+  $('traineeName').value = ''; $('traineeAge').value = ''; $('traineeGoal').value = '';
+  setTitleFromTemplate(1, tpl.titleParts[0]); setTitleFromTemplate(2, tpl.titleParts[1]); setTitleFromTemplate(3, tpl.titleParts[2]);
+  program = [];
+  let missing = 0;
+  for(const it of tpl.items){
+    let blob = null, thumb = null, type = it.type, libId = it.libId || null;
+    if(libId){ const lib = libCache.find(x => x.id === libId); if(lib){ blob = lib.blob; thumb = lib.thumb; } }
+    if(!blob && it.thumb){ blob = dataURLtoBlob(it.thumb); thumb = it.thumb; type = 'image'; missing++; }
+    if(!blob){ missing++; continue; }
+    program.push({id: ++uid, name: it.name, type, sets: it.sets, reps: it.reps, sec: it.sec, libId, url: URL.createObjectURL(blob), blob, thumb});
+  }
+  goTo('form'); renderProgram();
+  toast(missing ? `تم تحميل القالب (${missing} عنصر بدون الفيديو الأصلي، استُبدل بصورة ثابتة)` : 'تم تحميل القالب، عدّل بيانات المتدرب الجديد');
 }
 
 /* أجزاء العنوان وترتيب الصورة */
