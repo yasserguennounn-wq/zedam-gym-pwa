@@ -704,12 +704,28 @@ function makeLayout(){
   return {W, H, titleH, cells, blocks, note: {x: noteX, y: noteY, w: noteW, h: rowH},
           title: 'برنامج تمرين ' + act.map(a => a.name).filter(Boolean).join(' ')};
 }
+function marbleBand(g, x, y, w, h){
+  const gr = g.createLinearGradient(x, y, x, y + h);
+  gr.addColorStop(0, '#dbe9f8'); gr.addColorStop(1, '#c2dbf3');
+  g.fillStyle = gr; g.fillRect(x, y, w, h);
+  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+  for(let i = 0; i < 35; i++){
+    const bx = x + Math.random() * w, by = y + Math.random() * h, br = 14 + Math.random() * 55, rot = Math.random() * Math.PI;
+    g.fillStyle = `rgba(255,255,255,${0.07 + Math.random() * 0.1})`;
+    g.beginPath(); g.ellipse(bx, by, br, br * 0.35, rot, 0, Math.PI * 2); g.fill();
+  }
+  for(let i = 0; i < 14; i++){
+    const bx = x + Math.random() * w, by = y + Math.random() * h, br = 18 + Math.random() * 60, rot = Math.random() * Math.PI;
+    g.fillStyle = `rgba(140,165,195,${0.05 + Math.random() * 0.07})`;
+    g.beginPath(); g.ellipse(bx, by, br, br * 0.3, rot, 0, Math.PI * 2); g.fill();
+  }
+  g.restore();
+}
 function drawBase(L, logo){
   const c = document.createElement('canvas'); c.width = L.W; c.height = L.H;
   const g = c.getContext('2d');
   g.fillStyle = '#fff'; g.fillRect(0, 0, L.W, L.H);
-  const gr = g.createLinearGradient(0, 0, 0, L.titleH); gr.addColorStop(0, '#f7e9c6'); gr.addColorStop(1, '#f0daa3');
-  g.fillStyle = gr; g.fillRect(0, 0, L.W, L.titleH);
+  marbleBand(g, 0, 0, L.W, L.titleH);
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1b1b1b'; g.direction = 'rtl';
   g.font = '800 32px Cairo, sans-serif'; g.fillText(L.title, L.W / 2, L.titleH / 2 + 2);
   const nm = $('traineeName').value.trim();
@@ -728,12 +744,12 @@ function drawBase(L, logo){
     g.direction = 'ltr'; g.font = '800 20px Cairo, sans-serif';
     g.fillText(c.it.sets + ' × ' + c.it.reps, c.x + c.w / 2, c.y + c.h - 18);
   });
-  const n = L.note; g.fillStyle = '#a9ddd9'; g.fillRect(n.x, n.y, n.w, n.h);
+  const n = L.note; marbleBand(g, n.x, n.y, n.w, n.h);
   const r = Math.min(n.h * 0.22, n.w * 0.3), cx = n.x + n.w / 2, cy = n.y + n.h * 0.32;
   if(logo){ g.save(); g.beginPath(); g.arc(cx, cy, r, 0, 7); g.clip(); g.drawImage(logo, cx - r, cy - r, 2 * r, 2 * r); g.restore(); }
   const txt = $('traineeNote').value.trim();
   if(txt){
-    g.fillStyle = '#123a39'; g.direction = 'rtl'; g.font = '800 21px Cairo, sans-serif';
+    g.fillStyle = '#1b3a5c'; g.direction = 'rtl'; g.font = '800 21px Cairo, sans-serif';
     const maxW = n.w - 28, ls = []; let line = '';
     txt.split(/\s+/).forEach(w => { const t = line ? line + ' ' + w : w; if(g.measureText(t).width > maxW && line){ ls.push(line); line = w; } else line = t; });
     ls.push(line);
